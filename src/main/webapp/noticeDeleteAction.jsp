@@ -1,0 +1,82 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="java.sql.*" %>
+<%@ page import="util.DBUtil" %>
+
+<%
+    request.setCharacterEncoding("UTF-8");
+
+    String loginRole = (String) session.getAttribute("loginRole");
+
+    if (loginRole == null) {
+%>
+        <script>
+            alert("로그인이 필요합니다.");
+            location.href = "login.jsp";
+        </script>
+<%
+        return;
+    }
+
+    if (!"ADMIN".equals(loginRole)) {
+%>
+        <script>
+            alert("관리자만 삭제할 수 있습니다.");
+            location.href = "noticeList.jsp";
+        </script>
+<%
+        return;
+    }
+
+    String idParam = request.getParameter("id");
+
+    if (idParam == null || idParam.trim().equals("")) {
+%>
+        <script>
+            alert("잘못된 접근입니다.");
+            location.href = "noticeList.jsp";
+        </script>
+<%
+        return;
+    }
+
+    int noticeId = Integer.parseInt(idParam);
+
+
+
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+
+    try {
+    	Class.forName("com.mysql.cj.jdbc.Driver");
+
+    	conn = DBUtil.getConnection();
+    	
+        String sql = "DELETE FROM notice WHERE id = ?";
+        pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, noticeId);
+
+        int result = pstmt.executeUpdate();
+
+        if (result > 0) {
+%>
+            <script>
+                alert("공지사항이 삭제되었습니다.");
+                location.href = "noticeList.jsp";
+            </script>
+<%
+        } else {
+%>
+            <script>
+                alert("삭제할 공지사항을 찾을 수 없습니다.");
+                location.href = "noticeList.jsp";
+            </script>
+<%
+        }
+
+    } catch (Exception e) {
+        out.println("오류 발생: " + e.getMessage());
+    } finally {
+        if (pstmt != null) try { pstmt.close(); } catch(Exception e) {}
+        if (conn != null) try { conn.close(); } catch(Exception e) {}
+    }
+%>
