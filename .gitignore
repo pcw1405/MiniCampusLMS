@@ -1,88 +1,30 @@
-# =========================
-# OS / Editor
-# =========================
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# =========================
-# Eclipse / Workspace
-# =========================
-.metadata/
-.recommenders/
-Servers/
-RemoteSystemsTempFiles/
-
-# Eclipse generated folders
-bin/
-build/
-target/
-
-# Eclipse settings - 개인 설정이면 무시
-.settings/
-
-# =========================
-# Java / JSP generated files
-# =========================
-*.class
-*.log
-
-# WAR / 배포 파일
-*.war
-*.ear
-
-# =========================
-# Tomcat
-# =========================
-work/
-temp/
-logs/
-
-# =========================
-# Database dump / backup
-# =========================
-*.sql
-*.dump
-*.bak
-*.backup
-
-# =========================
-# AWS / SSH Keys
-# 절대 Git에 올리면 안 됨
-# =========================
+# AWS key
 *.pem
 *.ppk
 *.key
-id_rsa
-id_rsa.pub
 
-# =========================
-# Environment / Secrets
-# =========================
+# 배포 파일
+*.war
+
+# DB dump
+*.sql
+*.dump
+*.bak
+
+# 환경설정 / 비밀번호
 .env
 *.env
 db.properties
-application.properties
 config.properties
 secrets.properties
 
-# =========================
-# Temporary files
-# =========================
+# 임시 파일
 temp/
 tmp/
 *.tmp
 temp_*.txt
 
-# =========================
 # 압축 파일
-# =========================
 *.zip
 *.7z
 *.rar
-
-# =========================
-# 단, WEB-INF/lib의 JDBC jar는 남길 수 있음
-# Maven 없이 직접 jar 넣는 프로젝트라면 필요함
-# =========================
-!src/main/webapp/WEB-INF/lib/*.jar
