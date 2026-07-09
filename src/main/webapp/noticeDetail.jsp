@@ -1,6 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="java.sql.*" %>
 <%@ page import="util.DBUtil" %>
+<%@ page import="util.HtmlUtil" %>
 
 <!DOCTYPE html>
 <html>
@@ -14,14 +15,23 @@
 
 <%
     String id = request.getParameter("id");
+
+    if (id == null || !id.matches("\\d+")) {
+%>
+        <p>잘못된 접근입니다.</p>
+        <a href="noticeList.jsp">목록으로</a>
+</body>
+</html>
+<%
+        return;
+    }
+
     Connection conn = null;
     PreparedStatement pstmt = null;
     ResultSet rs = null;
 
     try {
-    	Class.forName("com.mysql.cj.jdbc.Driver");
-
-    	conn = DBUtil.getConnection();
+        conn = DBUtil.getConnection();
 
         String sql = "SELECT id, title, content, writer_id, created_at FROM notice WHERE id = ?";
         pstmt = conn.prepareStatement(sql);
@@ -39,7 +49,7 @@
     </tr>
     <tr>
         <th>제목</th>
-        <td><%= rs.getString("title") %></td>
+        <td><%= HtmlUtil.escape(rs.getString("title")) %></td>
     </tr>
     <tr>
         <th>작성자 ID</th>
@@ -47,12 +57,12 @@
     </tr>
     <tr>
         <th>작성일</th>
-        <td><%= rs.getTimestamp("created_at") %></td>
+        <td><%= HtmlUtil.escape(String.valueOf(rs.getTimestamp("created_at"))) %></td>
     </tr>
     <tr>
         <th>내용</th>
         <td style="height:150px;">
-            <%= rs.getString("content").replace("\n", "<br>") %>
+            <%= HtmlUtil.escape(rs.getString("content")).replace("\n", "<br>") %>
         </td>
     </tr>
 </table>
@@ -62,12 +72,13 @@
 <a href="main.jsp">메인으로</a>
 
 <%
-    loginRole = (String) session.getAttribute("loginRole");
+	String detailLoginRole = (String) session.getAttribute("loginRole");
+
 
     if ("ADMIN".equals(loginRole)) {
 %>
         <a href="noticeEdit.jsp?id=<%= rs.getInt("id") %>">수정</a>
-         <form action="noticeDeleteAction.jsp" method="post" style="display:inline;"
+        <form action="noticeDeleteAction.jsp" method="post" style="display:inline;"
               onsubmit="return confirm('정말 삭제하시겠습니까?');">
             <input type="hidden" name="id" value="<%= rs.getInt("id") %>">
             <input type="submit" value="삭제">
@@ -75,6 +86,7 @@
 <%
     }
 %>
+
 <%
         } else {
 %>
@@ -84,14 +96,12 @@
         }
 
     } catch (Exception e) {
-        out.println("오류 발생: " + e.getMessage());
+        out.println("처리 중 오류가 발생했습니다. 관리자에게 문의하세요.");
     } finally {
         if (rs != null) try { rs.close(); } catch(Exception e) {}
         if (pstmt != null) try { pstmt.close(); } catch(Exception e) {}
         if (conn != null) try { conn.close(); } catch(Exception e) {}
     }
-    
-    
 %>
 
 </body>

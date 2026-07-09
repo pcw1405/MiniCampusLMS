@@ -1,5 +1,6 @@
 <%@ page import="java.sql.*" %>
 <%@ page import="util.DBUtil" %>
+<%@ page import="util.HtmlUtil" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 
 <%
@@ -73,9 +74,9 @@
             resultCount++;
 %>
     <tr>
-        <td><%= rs.getInt("id") %></td>
-        <td><%= rs.getString("title") %></td>
-        <td><%= rs.getString("created_at") %></td>
+		<td><%= HtmlUtil.escape(rs.getString("payload")) %></td>
+		<td><%= HtmlUtil.escape(rs.getString("executed_sql")) %></td>
+		<td><%= HtmlUtil.escape(rs.getString("true_false_result")) %></td>
     </tr>
 <%
         }
