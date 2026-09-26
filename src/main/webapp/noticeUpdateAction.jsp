@@ -100,7 +100,7 @@
     try {
         conn = DBUtil.getConnection();
 
-        String sql = "UPDATE notice SET title = ?, content = ?, updated_at = NOW() WHERE id = ?";
+        String sql = "UPDATE notice SET title = ?, content = ? WHERE id = ?";
         pstmt = conn.prepareStatement(sql);
         pstmt.setString(1, title);
         pstmt.setString(2, content);
