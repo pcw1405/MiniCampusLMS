@@ -51,6 +51,7 @@
         <th>강의실</th>
         <th>정원</th>
         <th>상태</th>
+        <th>관리</th>
     </tr>
 
 <%
@@ -62,7 +63,7 @@
         conn = DBUtil.getConnection();
 
         String sql =
-            "SELECT c.course_code, c.course_name, cs.section_no, cs.professor_name, " +
+            "SELECT cs.id, c.course_code, c.course_name, cs.section_no, cs.professor_name, " +
             "cs.day_of_week, cs.start_time, cs.end_time, cs.room_name, cs.capacity, cs.status " +
             "FROM course_sections cs " +
             "JOIN semesters s ON cs.semester_id = s.id " +
@@ -86,6 +87,20 @@
         <td><%= HtmlUtil.escape(rs.getString("room_name")) %></td>
         <td><%= rs.getInt("capacity") %></td>
         <td><%= HtmlUtil.escape(rs.getString("status")) %></td>
+        <td>
+            <a href="adminCourseSectionEdit.jsp?id=<%= rs.getInt("id") %>">수정</a>
+            <br>
+            <a href="adminCourseSectionStudents.jsp?sectionId=<%= rs.getInt("id") %>">수강생</a>
+            <br>
+            <form action="adminCourseSectionStatusAction.jsp" method="post" style="margin:0;">
+                <input type="hidden" name="sectionId" value="<%= rs.getInt("id") %>">
+                <select name="status" onchange="this.form.submit()">
+                    <option value="OPEN" <%= "OPEN".equals(rs.getString("status")) ? "selected" : "" %>>OPEN</option>
+                    <option value="CLOSED" <%= "CLOSED".equals(rs.getString("status")) ? "selected" : "" %>>CLOSED</option>
+                    <option value="CANCELLED" <%= "CANCELLED".equals(rs.getString("status")) ? "selected" : "" %>>CANCELLED</option>
+                </select>
+            </form>
+        </td>
     </tr>
 <%
         }
@@ -93,7 +108,7 @@
     } catch (Exception e) {
 %>
     <tr>
-        <td colspan="10">개설강좌 목록을 불러오는 중 오류가 발생했습니다.</td>
+        <td colspan="11">개설강좌 목록을 불러오는 중 오류가 발생했습니다.</td>
     </tr>
 <%
     } finally {
