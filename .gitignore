@@ -28,3 +28,7 @@ temp_*.txt
 *.zip
 *.7z
 *.rar
+
+cookies*.txt
+*.class
+build/

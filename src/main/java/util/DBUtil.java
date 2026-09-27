@@ -6,11 +6,9 @@ import java.sql.SQLException;
 
 public class DBUtil {
 
-    private static final String URL =
-            "jdbc:mysql://localhost:3306/mini_lms?serverTimezone=Asia/Seoul&characterEncoding=UTF-8";
-
-    private static final String USER = "root";
-    private static final String PASSWORD = "1234";
+    private static final String URL = getRequiredEnv("MINICAMPUS_DB_URL");
+    private static final String USER = getRequiredEnv("MINICAMPUS_DB_USER");
+    private static final String PASSWORD = getRequiredEnv("MINICAMPUS_DB_PASSWORD");
 
     static {
         try {
@@ -18,6 +16,14 @@ public class DBUtil {
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("MySQL JDBC Driver 로딩 실패", e);
         }
+    }
+
+    private static String getRequiredEnv(String key) {
+        String value = System.getenv(key);
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalStateException("필수 환경 변수가 없습니다: " + key);
+        }
+        return value.trim();
     }
 
     public static Connection getConnection() throws SQLException {

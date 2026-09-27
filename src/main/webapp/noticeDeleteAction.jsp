@@ -74,7 +74,12 @@
         }
 
     } catch (Exception e) {
-        out.println("오류 발생: " + e.getMessage());
+%>
+        <script>
+            alert("공지사항 삭제 중 오류가 발생했습니다.");
+            location.href = "noticeList.jsp";
+        </script>
+<%
     } finally {
         if (pstmt != null) try { pstmt.close(); } catch(Exception e) {}
         if (conn != null) try { conn.close(); } catch(Exception e) {}

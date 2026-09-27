@@ -40,6 +40,7 @@
 
     <h2>관리 기능</h2>
     <ul>
+        <li><a href="adminCourseList.jsp">개설강좌 목록</a></li>
         <li>회원 관리</li>
         <li>공지사항 관리</li>
         <li>수강신청 관리</li>

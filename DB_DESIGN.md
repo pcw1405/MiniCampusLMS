@@ -208,10 +208,67 @@ UNIQUE: (student_id, section_id)
 
 ## 5. 테이블 간 관계
 
+### 학사 핵심 ERD
+
+> notice와 security_test_log는 별도 보안/공지 영역으로 유지하므로, 학사 핵심 ERD에서는 제외한다.
+
+```mermaid
+erDiagram
+    USERS {
+        int id PK
+    }
+
+    STUDENTS {
+        int id PK
+        int user_id FK
+    }
+
+    COURSES {
+        int id PK
+    }
+
+    SEMESTERS {
+        int id PK
+    }
+
+    COURSE_SECTIONS {
+        int id PK
+        int course_id FK
+        int semester_id FK
+    }
+
+    ENROLLMENTS {
+        int id PK
+        int student_id FK
+        int section_id FK
+    }
+
+    USERS ||--o| STUDENTS : "1:0..1"
+    STUDENTS ||--o{ ENROLLMENTS : "1:N"
+    COURSES ||--o{ COURSE_SECTIONS : "1:N"
+    SEMESTERS ||--o{ COURSE_SECTIONS : "1:N"
+    COURSE_SECTIONS ||--o{ ENROLLMENTS : "1:N"
+
+    COURSE_SECTIONS }o--|| COURSES : "FK"
+    COURSE_SECTIONS }o--|| SEMESTERS : "FK"
+    STUDENTS }o--|| USERS : "FK"
+    ENROLLMENTS }o--|| STUDENTS : "FK"
+    ENROLLMENTS }o--|| COURSE_SECTIONS : "FK"
+```
+
+### 관계 설명
+
+- users 1:0..1 students
+- students 1:N enrollments
+- courses 1:N course_sections
+- semesters 1:N course_sections
+- course_sections 1:N enrollments
+
 ### 관계 구조
 
-- users 1:1 students
-  - 하나의 로그인 계정은 하나의 학생 프로필을 가진다.
+- users 1:0..1 students
+  - 하나의 user는 학생 계정인 경우에만 최대 하나의 students 레코드를 가질 수 있다.
+  - 모든 user가 학생인 것은 아니므로, 학생이 아닌 계정은 students 레코드를 가질 수 없다.
 - students 1:N enrollments
   - 학생은 여러 개설강좌를 신청할 수 있다.
 - course_sections 1:N enrollments
@@ -258,9 +315,7 @@ users
 
 ### UNIQUE
 - users.username
-- students.user_id
 - students.student_number
-- semesters(year, term)
 - course_sections(course_id, semester_id, section_no)
 - enrollments(student_id, section_id)
 

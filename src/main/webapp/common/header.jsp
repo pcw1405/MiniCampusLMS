@@ -1,8 +1,8 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 
 <%
-    String loginName = (String) session.getAttribute("loginName");
-    String loginRole = (String) session.getAttribute("loginRole");
+    String headerLoginName = (String) session.getAttribute("loginName");
+    String headerLoginRole = (String) session.getAttribute("loginRole");
 %>
 
 <div style="border-bottom:1px solid #ccc; padding:10px; margin-bottom:20px;">
@@ -15,12 +15,12 @@
     <a href="mypage.jsp">마이페이지</a>
 
 <%
-    if (loginName != null) {
+    if (headerLoginName != null) {
 %>
     |
-    <span><%= loginName %>님</span>
+    <span><%= headerLoginName %>님</span>
 
-    <% if ("ADMIN".equals(loginRole)) { %>
+    <% if ("ADMIN".equals(headerLoginRole)) { %>
         <span>[관리자]</span>
     <% } %>
 

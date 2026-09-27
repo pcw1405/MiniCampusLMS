@@ -41,10 +41,12 @@
 <%
         }
     } catch (Exception e) {
-        out.println("<h3>로그인 처리 중 오류 발생</h3>");
-        out.println("<pre>");
-        e.printStackTrace(new java.io.PrintWriter(out));
-        out.println("</pre>");
+%>
+        <script>
+            alert("로그인 처리 중 오류가 발생했습니다.");
+            history.back();
+        </script>
+<%
     } finally {
         if (rs != null) try { rs.close(); } catch(Exception e) {}
         if (pstmt != null) try { pstmt.close(); } catch(Exception e) {}

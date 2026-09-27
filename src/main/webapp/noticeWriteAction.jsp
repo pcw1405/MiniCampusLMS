@@ -1,5 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="java.sql.*" %>
+<%@ page import="util.DBUtil" %>
 
 <%
     request.setCharacterEncoding("UTF-8");
@@ -42,16 +43,11 @@
 
     int writerId = Integer.parseInt(String.valueOf(userIdObj));
 
-    String dbUrl = "jdbc:mysql://localhost:3306/mini_lms?serverTimezone=Asia/Seoul&characterEncoding=UTF-8";
-    String dbUser = "root";
-    String dbPass = "1234";
-
     Connection conn = null;
     PreparedStatement pstmt = null;
 
     try {
-        Class.forName("com.mysql.cj.jdbc.Driver");
-        conn = DriverManager.getConnection(dbUrl, dbUser, dbPass);
+        conn = DBUtil.getConnection();
 
         String sql = "INSERT INTO notice (title, content, writer_id, created_at) VALUES (?, ?, ?, NOW())";
         pstmt = conn.prepareStatement(sql);
@@ -79,7 +75,12 @@
         }
 
     } catch (Exception e) {
-        out.println("오류 발생: " + e.getMessage());
+%>
+        <script>
+            alert("공지사항 처리 중 오류가 발생했습니다.");
+            history.back();
+        </script>
+<%
     } finally {
         if (pstmt != null) try { pstmt.close(); } catch(Exception e) {}
         if (conn != null) try { conn.close(); } catch(Exception e) {}
