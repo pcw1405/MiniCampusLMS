@@ -22,6 +22,10 @@
 
     <% if ("ADMIN".equals(headerLoginRole)) { %>
         <span>[관리자]</span>
+    <% } else if ("STUDENT".equals(headerLoginRole)) { %>
+        <span>[학생]</span>
+        |
+        <a href="studentCourseList.jsp">개설강좌 조회</a>
     <% } %>
 
     |

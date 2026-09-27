@@ -30,7 +30,10 @@
     <ul>
         <li><a href="mypage.jsp">마이페이지</a></li>
         <li><a href="noticeList.jsp">공지사항</a></li>
+        <li><a href="studentCourseList.jsp">개설강좌 조회</a></li>
+        <% if ("ADMIN".equals(loginRole)) { %>
         <li><a href="admin.jsp">관리자 페이지</a></li>
+        <% } %>
         <li><a href="logout.jsp">로그아웃</a></li>
     </ul>
 </body>
