@@ -32,3 +32,10 @@ temp_*.txt
 cookies*.txt
 *.class
 build/
+
+# Build outputs
+build/
+*.class
+
+# Local test cookies
+cookies*.txt
