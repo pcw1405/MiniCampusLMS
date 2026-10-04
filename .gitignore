@@ -1,41 +1,35 @@
-# AWS key
+# Secrets and local credentials
 *.pem
 *.ppk
 *.key
-
-# 배포 파일
-*.war
-
-# DB dump
-*.sql
-*.dump
-*.bak
-
-# 환경설정 / 비밀번호
 .env
 *.env
 db.properties
 config.properties
 secrets.properties
 
-# 임시 파일
+# Local database data and exports
+*.sql
+!database/schema.sql
+!database/seed.example.sql
+*.dump
+*.bak
+
+# Build and deployment outputs
+build/
+*.class
+*.war
+
+# Temporary files and logs
 temp/
 tmp/
 *.tmp
 temp_*.txt
+*.log
 
-# 압축 파일
+# Archives
 *.zip
 *.7z
 *.rar
-
-cookies*.txt
-*.class
-build/
-
-# Build outputs
-build/
-*.class
-
-# Local test cookies
+# Local browser cookies
 cookies*.txt
