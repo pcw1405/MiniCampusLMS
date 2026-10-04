@@ -50,6 +50,7 @@
         <th>정원</th>
         <th>현재 신청인원</th>
         <th>상태</th>
+        <th>신청</th>
     </tr>
 
 <%
@@ -61,7 +62,7 @@
         conn = DBUtil.getConnection();
 
         String sql =
-            "SELECT c.course_code, c.course_name, cs.section_no, cs.professor_name, " +
+            "SELECT cs.id, c.course_code, c.course_name, cs.section_no, cs.professor_name, " +
             "cs.day_of_week, cs.start_time, cs.end_time, cs.room_name, cs.capacity, cs.status, " +
             "COUNT(e.id) AS current_enrolled_count " +
             "FROM course_sections cs " +
@@ -69,7 +70,7 @@
             "JOIN courses c ON cs.course_id = c.id " +
             "LEFT JOIN enrollments e ON e.section_id = cs.id AND e.status = 'ENROLLED' " +
             "WHERE s.year = 2026 AND s.term = '1' AND cs.status <> 'CANCELLED' " +
-            "GROUP BY c.course_code, c.course_name, cs.section_no, cs.professor_name, " +
+            "GROUP BY cs.id, c.course_code, c.course_name, cs.section_no, cs.professor_name, " +
             "cs.day_of_week, cs.start_time, cs.end_time, cs.room_name, cs.capacity, cs.status " +
             "ORDER BY c.course_code, cs.section_no";
 
@@ -90,6 +91,22 @@
         <td><%= rs.getInt("capacity") %></td>
         <td><%= rs.getInt("current_enrolled_count") %> / <%= rs.getInt("capacity") %></td>
         <td><%= HtmlUtil.escape(rs.getString("status")) %></td>
+        <td>
+<%
+            if ("OPEN".equals(rs.getString("status"))) {
+%>
+            <form action="studentCourseEnrollAction.jsp" method="post" style="margin:0;">
+                <input type="hidden" name="sectionId" value="<%= rs.getInt("id") %>">
+                <button type="submit">신청</button>
+            </form>
+<%
+            } else {
+%>
+            -
+<%
+            }
+%>
+        </td>
     </tr>
 <%
         }
@@ -97,7 +114,7 @@
         if (!hasCourse) {
 %>
     <tr>
-        <td colspan="9">2026년 1학기 개설강좌가 없습니다.</td>
+        <td colspan="10">2026년 1학기 개설강좌가 없습니다.</td>
     </tr>
 <%
         }
@@ -105,7 +122,7 @@
     } catch (Exception e) {
 %>
     <tr>
-        <td colspan="9">개설강좌 목록을 불러오는 중 오류가 발생했습니다.</td>
+        <td colspan="10">개설강좌 목록을 불러오는 중 오류가 발생했습니다.</td>
     </tr>
 <%
     } finally {
