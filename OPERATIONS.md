@@ -185,7 +185,6 @@ DB 연결 값은 소스에 넣지 않는다. `src/main/java/util/DBUtil.java`는
 
 ---
 
-## 9. Windows Server 2022 Phase 1
 ## 9. [완료] Windows Server 2022 Phase 1
 ### [완료] Windows Server 2022 운영 실습
 
