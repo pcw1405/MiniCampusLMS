@@ -26,6 +26,8 @@
         <span>[학생]</span>
         |
         <a href="studentCourseList.jsp">개설강좌 조회</a>
+        |
+        <a href="studentEnrollmentList.jsp">수강내역</a>
     <% } %>
 
     |
