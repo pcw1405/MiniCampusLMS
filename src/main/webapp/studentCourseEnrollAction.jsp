@@ -61,9 +61,61 @@
     ResultSet studentRs = null;
     ResultSet sectionRs = null;
     ResultSet duplicateRs = null;
+    boolean transactionStarted = false;
+    boolean transactionCommitted = false;
+    boolean transactionRolledBack = false;
 
     try {
         conn = DBUtil.getConnection();
+        conn.setAutoCommit(false);
+        transactionStarted = true;
+
+        String sectionSql =
+            "SELECT cs.status, cs.capacity " +
+            "FROM course_sections cs " +
+            // 같은 개설강좌 신청을 직렬화해 정원 검사를 보호한다.
+            "WHERE cs.id = ? FOR UPDATE";
+
+        sectionStmt = conn.prepareStatement(sectionSql);
+        sectionStmt.setInt(1, sectionId);
+        sectionRs = sectionStmt.executeQuery();
+
+        if (!sectionRs.next()) {
+%>
+            <script>
+                alert("존재하지 않는 강좌입니다.");
+                history.back();
+            </script>
+<%
+            return;
+        }
+
+        String sectionStatus = sectionRs.getString("status");
+        int capacity = sectionRs.getInt("capacity");
+        sectionRs.close();
+        sectionRs = null;
+        sectionStmt.close();
+        sectionStmt = null;
+
+        if (!"OPEN".equals(sectionStatus)) {
+%>
+            <script>
+                alert("현재 신청 가능한 상태가 아닙니다.");
+                location.href = "studentCourseList.jsp";
+            </script>
+<%
+            return;
+        }
+
+        if (!"STUDENT".equals(loginRole)) {
+%>
+            <script>
+                alert("학생만 수강신청할 수 있습니다.");
+                location.href = "main.jsp";
+            </script>
+<%
+            return;
+        }
 
         String studentSql =
             "SELECT s.id AS student_id " +
@@ -86,39 +138,26 @@
 
         int studentId = studentRs.getInt("student_id");
 
-        String sectionSql =
-            "SELECT cs.id, cs.status, cs.capacity, " +
-            "(SELECT COUNT(*) FROM enrollments e WHERE e.section_id = cs.id AND e.status = 'ENROLLED') AS current_count " +
-            "FROM course_sections cs " +
-            "WHERE cs.id = ?";
+        String countSql =
+            "SELECT COUNT(*) AS current_count " +
+            "FROM enrollments " +
+            "WHERE section_id = ? AND status = 'ENROLLED'";
 
-        sectionStmt = conn.prepareStatement(sectionSql);
+        sectionStmt = conn.prepareStatement(countSql);
         sectionStmt.setInt(1, sectionId);
         sectionRs = sectionStmt.executeQuery();
 
         if (!sectionRs.next()) {
 %>
             <script>
-                alert("존재하지 않는 강좌입니다.");
-                history.back();
-            </script>
-<%
-            return;
-        }
-
-        String sectionStatus = sectionRs.getString("status");
-        int currentCount = sectionRs.getInt("current_count");
-        int capacity = sectionRs.getInt("capacity");
-
-        if (!"OPEN".equals(sectionStatus)) {
-%>
-            <script>
-                alert("현재 신청 가능한 상태가 아닙니다.");
+                alert("수강 인원을 확인하지 못했습니다.");
                 location.href = "studentCourseList.jsp";
             </script>
 <%
             return;
         }
+
+        int currentCount = sectionRs.getInt("current_count");
 
         if (currentCount >= capacity) {
 %>
@@ -158,6 +197,8 @@
         int insertCount = insertStmt.executeUpdate();
 
         if (insertCount > 0) {
+            conn.commit();
+            transactionCommitted = true;
 %>
             <script>
                 alert("수강신청이 완료되었습니다.");
@@ -188,6 +229,21 @@
         </script>
 <%
     } finally {
+        if (conn != null && transactionStarted && !transactionCommitted) {
+            try {
+                conn.rollback();
+                transactionRolledBack = true;
+            } catch (SQLException e) {
+                application.log("수강신청 트랜잭션 롤백에 실패했습니다.", e);
+            }
+        }
+        if (conn != null && transactionStarted && (transactionCommitted || transactionRolledBack)) {
+            try {
+                conn.setAutoCommit(true);
+            } catch (SQLException e) {
+                application.log("수강신청 연결의 AutoCommit 복구에 실패했습니다.", e);
+            }
+        }
         if (duplicateRs != null) try { duplicateRs.close(); } catch (Exception e) {}
         if (sectionRs != null) try { sectionRs.close(); } catch (Exception e) {}
         if (studentRs != null) try { studentRs.close(); } catch (Exception e) {}

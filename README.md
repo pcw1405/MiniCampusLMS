@@ -36,9 +36,15 @@ Nginx Reverse Proxy는 사용자 요청을 먼저 받아 내부 Tomcat으로 전
 - 관리자 과목 등록, 개설강좌 등록·수정·상태 변경, 수강생 조회
 - 학생의 2026년 1학기 개설강좌 조회 및 수강신청
 - 신청 시 학생 권한, 개설강좌 `OPEN` 상태, 정원, 동일 개설강좌 중복을 확인
+- 학생 본인의 수강내역 조회와 본인 enrollment 소유권을 확인하는 수강취소
+- 수강취소 시 행을 삭제하지 않고 `status = 'CANCELED'`, `canceled_at = NOW()`로 이력 유지
 - 보안 실습용 공지 검색 페이지를 안전 버전과 의도적 취약 버전으로 분리
 
-수강신청은 동일 학생의 동일 개설강좌 중복과 정원 초과를 검사합니다. 시간표 충돌이나 같은 과목의 다른 분반 신청 여부는 현재 확인 로직에 포함되어 있지 않습니다.
+수강신청은 동일 학생의 동일 개설강좌 중복과 정원 초과를 검사합니다. 개설강좌 행 잠금과 트랜잭션을 적용해 동시 신청을 처리합니다. 시간표 충돌이나 같은 과목의 다른 분반 신청 여부는 현재 확인 로직에 포함되어 있지 않습니다.
+
+### 수강신청 동시성 검증
+
+로컬 Eclipse/Tomcat 환경에서 `section_id=12`, `capacity=1`, 서로 다른 학생 4명, JMeter Thread 4 및 Synchronizing Timer 4 조건으로 검증했습니다. 개선 전에는 8건 요청에서 오류 없이 처리됐지만 `ENROLLED=4`가 되어 정원 초과가 재현됐습니다. `studentCourseEnrollAction.jsp`에 JDBC 트랜잭션과 `SELECT ... FOR UPDATE`를 적용한 뒤 동일 조건에서 8건 요청 오류 0건, 최종 `ENROLLED=1`을 확인했습니다. Windows Server에 최신 WAR를 재배포한 결과는 아직 검증되지 않았습니다.
 
 ## DB 설계
 
@@ -50,7 +56,7 @@ Nginx Reverse Proxy는 사용자 요청을 먼저 받아 내부 Tomcat으로 전
 
 | 영역 | 실제 실습에서 확인한 내용 |
 | :--- | :--- |
-| Windows Server | Windows Server 2022 VM에 Java 11, Tomcat 9 Windows Service, MySQL 8 설치 및 WAR 배포 |
+| Windows Server | Windows Server 2022 VM에 Java 11, Tomcat 9 Windows Service, MySQL 8 설치 및 기존 WAR 배포 확인. 동시성 개선을 포함한 최신 WAR 재배포는 미완료 |
 | DB 운영 | 애플리케이션 전용 계정과 SELECT/INSERT/UPDATE/DELETE 최소 권한, 시스템 환경변수로 DB 접속정보 분리 |
 | 백업·복구 | `mysqldump` 백업을 별도 Recovery DB에 복원하고 테이블·데이터 건수 확인 |
 | 로그 | Windows Event Log, Windows Firewall Log, Nginx Access Log 확인 |
@@ -94,10 +100,8 @@ ModSecurity v3와 OWASP Core Rule Set(CRS)을 설치했고, 약 924개의 로컬
 
 ## 향후 개선
 
-- 수강취소, 내 수강내역 조회, 취소 후 재신청
+- 취소 후 같은 분반 재신청
 - 같은 과목의 다른 분반 중복 검사와 시간표 충돌 검사
-- 명시적 DB Transaction 및 commit/rollback, DB Lock
-- JMeter 동시성 검증
 - Splunk 통합 로그 수집, 대시보드와 Alert
 - 예약 백업 및 보관주기 정책
 - 별도 DB 서버 분리, HTTPS/TLS 최종 구성, IDS/IPS 및 DLP 실습

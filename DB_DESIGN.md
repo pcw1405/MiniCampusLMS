@@ -27,10 +27,11 @@ MiniCampusLMS의 학사 기능 구현을 위한 최소 데이터베이스 구조
 - course_sections는 특정 학기와 특정 분반의 개설 강좌를 의미한다.
 - students는 users 계정과 1:1 관계로 연결한다.
 - 학생은 course_sections를 대상으로 수강신청한다.
-- 동일 개설강좌 중복 신청은 서버 검증 + DB UNIQUE 제약으로 함께 보장한다.
-- 정원 초과, 시간 충돌, 권한 검사는 서버 측에서도 수행한다.
+- 동일 개설강좌 중복 신청은 서버 검증과 DB UNIQUE 제약으로 방지한다.
+- 수강신청 시 권한, 개설 상태, 정원 및 동일 개설강좌 중복은 서버에서 확인한다.
+- 시간표 충돌 검사는 아직 구현하지 않았다.
 - 실패 시 일부 데이터만 저장되지 않도록 트랜잭션을 고려한다.
-- 향후 동시 수강신청 테스트가 가능하도록 설계한다.
+- 정원 초과를 방지하기 위해 수강신청 트랜잭션 안에서 개설강좌 행을 잠그고 정원을 다시 확인한다.
 - 필요 이상의 테이블과 복잡한 정규화는 하지 않는다.
 - 성적, 등록금, 휴학, 장학금, 교수 기능은 별도로 추가하지 않는다.
 
@@ -83,28 +84,9 @@ MiniCampusLMS의 학사 기능 구현을 위한 최소 데이터베이스 구조
 | memo | VARCHAR(255) | NULL 허용 | 메모 |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 로그 생성 시각 |
 
-### courses
+학사 기능의 `courses`, `course_sections`, `enrollments`는 아래 구조를 기준으로 사용한다. `enrollments`의 컬럼과 제약은 실제 MySQL에서 확인했다. 과거에 기술된 `courses(id, course_name, professor)` 및 `enrollments(user_id, course_id, created_at)` 구조는 현재 구조가 아니므로 적용하지 않는다.
 
-기존 테이블로 이미 존재한다. 현재는 과목 기본 정보만 저장한다.
-
-| 컬럼 | 자료형 | 제약조건 | 설명 |
-|---|---|---|---|
-| id | INT | PK, AUTO_INCREMENT | 과목 ID |
-| course_name | VARCHAR(100) | NOT NULL | 과목명 |
-| professor | VARCHAR(50) | NOT NULL | 현재 임시 저장 값. 향후 교수 기능 확장 시 분리 가능 |
-
-### enrollments
-
-기존 테이블로 이미 존재한다. 현재는 학생이 과목을 신청한 사실만 저장한다.
-
-| 컬럼 | 자료형 | 제약조건 | 설명 |
-|---|---|---|---|
-| id | INT | PK, AUTO_INCREMENT | 신청 ID |
-| user_id | INT | NOT NULL | 신청한 사용자 ID |
-| course_id | INT | NOT NULL | 신청한 과목 ID |
-| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 신청 시각 |
-
-## 4. 추가로 필요한 최소 테이블
+## 4. 학사 테이블 구조
 
 ### students
 
@@ -138,7 +120,7 @@ MiniCampusLMS의 학사 기능 구현을 위한 최소 데이터베이스 구조
 
 필요 이유:
 - 같은 과목이 여러 학기, 여러 분반으로 개설될 수 있으므로 과목 자체와 개설 정보를 분리한다.
-- 현재 기존 courses 테이블의 기본 구조를 유지하면서 필요한 최소 컬럼만 추가한다.
+- `course_code`, `course_name`을 포함한 과목 기본 정보를 관리한다.
 
 ### semesters
 
@@ -201,10 +183,13 @@ UNIQUE: (course_id, semester_id, section_no)
 
 UNIQUE: (student_id, section_id)
 
+실제 MySQL `enrollments` 구조는 위 컬럼을 사용하며, `student_id`는 `students.id`, `section_id`는 `course_sections.id`를 참조한다. 상태는 `ENUM('ENROLLED','CANCELED')`이고, `CHECK` 제약은 수강 중이면 `canceled_at IS NULL`, 취소 상태이면 `canceled_at IS NOT NULL`이 되도록 제한한다. 학생·개설강좌 FK와 `(student_id, section_id)` UNIQUE 제약도 확인했다.
+
 필요 이유:
 - 학생이 동일 개설강좌를 중복 신청하는 것을 DB 차원에서 막아야 한다.
 - 신청 취소를 상태값으로 관리하여 전체 이력 추적이 가능하게 한다.
-- 수강 내역 조회는 현재 상태가 ENROLLED인 데이터만 기준으로 계산한다.
+- 현재 정원은 `status = 'ENROLLED'`인 데이터만 기준으로 계산한다.
+- `(student_id, section_id)` UNIQUE는 취소 이력도 동일 행에서 상태로 유지하는 현재 구조와 맞는다. 이 제약 때문에 같은 분반을 취소한 뒤 새 enrollment 행을 추가하는 재신청은 현재 지원하지 않는다.
 
 ## 5. 테이블 간 관계
 
@@ -360,13 +345,24 @@ users
 ### 정원 초과
 강좌의 현재 수강 인원 수가 정원보다 많아지면 안 된다.
 
-최소 구조에서 구현 방식:
-- 서버는 COUNT(*)로 현재 신청 인원 확인
-- 신청 직전에 트랜잭션으로 기준 시점의 인원 수를 읽고 저장
-- 향후 동시성 테스트 단계에서 트랜잭션 / 잠금 로직을 추가한다.
+현재 구현 방식:
+- JDBC 연결에서 `setAutoCommit(false)`로 트랜잭션을 시작한다.
+- `SELECT ... FROM course_sections WHERE id = ? FOR UPDATE`로 대상 개설강좌 행을 잠근다.
+- 잠금 획득 후 `status = 'ENROLLED'`인 신청 수를 다시 `COUNT(*)`하고 정원과 비교한다.
+- 정원 이내일 때 INSERT 후 commit하며, 조기 종료나 예외 등 미커밋 경로는 rollback한다.
+- 같은 개설강좌 행에 대한 신청을 직렬화해 정원 확인과 INSERT 사이의 Race Condition을 방지한다.
 
-### 시간 충돌
-학생이 같은 요일, 중첩 시간대의 과목을 동시에 신청할 수 없다.
+JMeter 동시성 검증 결과:
+
+| 구분 | 테스트 조건 | JMeter 결과 | DB 최종 결과 |
+|---|---|---|---|
+| 개선 전 | `section_id=12`, `capacity=1`, 서로 다른 학생 4명, Thread 4, Synchronizing Timer 4 | 요청 8건, Err 0 | `ENROLLED=4` (정원 초과 재현) |
+| 개선 후 | 동일 조건 | 요청 8건, Err 0 | `ENROLLED=1` (정원 초과 방지 확인) |
+
+이 결과는 로컬 Eclipse/Tomcat 환경에서 검증했다. 최신 변경을 포함한 Windows Server 최종 WAR 재배포는 아직 완료하지 않았다.
+
+### 시간 충돌 (미구현)
+학생이 같은 요일, 중첩 시간대의 과목을 동시에 신청하지 못하도록 하는 검사는 아직 구현하지 않았다. 향후 구현 시 필요한 데이터는 다음과 같다.
 
 필요 데이터:
 - course_sections.day_of_week
@@ -375,7 +371,7 @@ users
 - enrollments.student_id
 - enrollments.section_id
 
-서버는 학생이 이미 신청한 다른 section의 시간표와 새 강좌의 시간표를 비교하여 겹침 여부를 판단한다.
+예정 로직은 학생이 이미 신청한 다른 section의 시간표와 새 강좌의 시간표를 비교하는 것이다.
 
 ### 권한
 수강신청은 STUDENT 사용자만 가능하다.
@@ -387,28 +383,22 @@ users
 
 ## 8. 트랜잭션 고려사항
 
-수강신청은 다음 절차를 하나의 트랜잭션으로 처리해야 한다.
+현재 수강신청 트랜잭션 순서는 다음과 같다.
 
-1. 세션 사용자 확인
-2. 학생 여부 확인
-3. 중복 신청 검사
-4. 정원 체크
-5. 시간 충돌 검사
-6. 신청 insert
-7. 성공 시 commit
-8. 실패 시 rollback
+1. 세션 로그인과 `STUDENT` 권한 확인
+2. 트랜잭션 시작
+3. `SELECT ... FOR UPDATE`로 대상 개설강좌를 잠그고 `OPEN` 상태 및 정원 조회
+4. 세션 사용자와 연결된 학생 조회
+5. 잠금 상태를 유지한 채 현재 `ENROLLED` 인원 재조회 및 정원 검사
+6. 동일 학생·개설강좌 중복 검사
+7. 수강신청 INSERT
+8. 성공 시 commit, 미커밋 실패 경로는 rollback
 
-이 구조는 “실패하면 일부 데이터만 저장되지 않는다”를 만족한다.
-
-향후 동시 수강신청 테스트는 아래 조건으로 확인한다.
-- 정원 30명 강좌
-- 여러 학생이 동시에 신청
-- 최종 신청 인원이 정원을 초과하지 않는지 확인
-- 중복 신청이 발생하지 않는지 확인
+시간표 충돌 검사와 같은 과목의 다른 분반 중복 검사는 아직 이 흐름에 구현되어 있지 않다.
 
 ## 9. 구현 범위
 
-현재 단계에서 반드시 설계해야 하는 테이블은 아래와 같다.
+현재 학사 기능에서 사용하는 테이블은 아래와 같다.
 
 - students
 - courses
@@ -416,15 +406,16 @@ users
 - course_sections
 - enrollments
 
-현재 단계에서 반드시 구현할 기능은 아래와 같다.
+구현 및 검증된 학생 기능은 아래와 같다.
 
 - 강좌 조회
 - 수강신청
 - 수강취소
-- 신청내역
+- 본인 수강내역 조회
 - 중복 신청 방지
 - 정원 제한
-- 시간 충돌 검사
+
+아직 구현하지 않은 수강 규칙은 같은 과목의 다른 분반 중복 방지, 시간표 충돌 검사, 취소 후 동일 분반 재신청이다.
 
 ## 10. 현재 범위를 넘어가는 항목
 
@@ -487,27 +478,24 @@ users
 
 ## 12. 향후 운영/인프라 확장
 
-학사 기능 완성 이후 별도 단계에서 진행한다.
+아래는 아직 완료하지 않은 운영/인프라 작업이다.
 
-- Linux
-- Nginx
-- Tomcat 운영
 - DB 서버 분리
-- JMeter
 - Splunk
-- Firewall
 - IDS/IPS
-- WAF
-- 인프라 보안진단
+- HTTPS/TLS
+- 자동 예약 백업 및 보관주기 정책
 
 ## 13. 최종 정리
 
-현재 구조를 유지하면서 최소 범위만 추가하면, MVP 수강신청 기능을 안정적으로 구현할 수 있다.
+현재 DB는 학생, 과목, 학기, 개설강좌, 수강신청을 분리한다. 수강취소는 enrollment를 삭제하지 않고 상태와 취소 시각으로 기록한다. 정원 경쟁 조건은 트랜잭션과 개설강좌 행 잠금으로 처리하며, 로컬 동시성 테스트에서 정원 초과 방지를 확인했다.
 
 핵심은 다음 3가지이다.
 
 1. users는 계정/권한 관리용으로 유지한다.
-2. students와 course_sections를 추가해 학생 및 개설강좌 단위로 관리한다.
-3. enrollments에 UNIQUE 제약을 두고, 정원/시간 충돌 검사는 서버에서 처리한다.
+2. students와 course_sections를 통해 학생 및 개설강좌 단위로 관리한다.
+3. enrollments는 학생·개설강좌 FK와 UNIQUE 제약을 사용하고 취소 상태를 보존한다.
+4. 정원은 트랜잭션과 `FOR UPDATE` 잠금 후 재확인한다.
+5. 시간표 충돌, 동일 과목 다른 분반 중복, 취소 후 재신청은 향후 개선 항목이다.
 
 이 설계는 JSP + JDBC + MySQL 구조와 가장 잘 맞으며, 이후 schema.sql 작성 단계로 바로 이어질 수 있을 정도로 구체적이다.

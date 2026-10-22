@@ -4,7 +4,7 @@
 본 문서는 MiniCampusLMS의 실제 실습 환경, 확인한 운영 점검 결과, 장애 대응 절차와 남은 계획을 정리한다.
 
 > **운영 원칙**
-> - **[완료]**로 표시한 항목은 실제 VM 환경에서 수행하고 검증한 실습이다.
+> - **[완료]**로 표시한 항목은 해당 항목에 명시한 환경에서 수행하고 검증한 실습이다.
 > - **[현재 상태]**에는 저장소에 포함된 구현과 증빙 자료의 유무를 구분해 적는다.
 > - **[향후 계획]**은 아직 수행하지 않은 작업이다.
 > - GitHub 저장소에는 현재 VM 설정 파일, 로그, 백업 파일 등 운영 증빙이 포함되어 있지 않다. 증빙은 민감정보를 제거해 별도 정리할 예정이다.
@@ -18,7 +18,7 @@
 | :--- | :--- |
 | 운영체제 | Windows Server 2022 VM 구축 |
 | Java / WAS | Java 11, Apache Tomcat 9 설치 및 Windows Service 등록 |
-| 데이터베이스 | MySQL 8 설치, 애플리케이션 WAR 배포 |
+| 데이터베이스 | MySQL 8 설치, 기존 애플리케이션 WAR 배포 |
 | 애플리케이션 확인 | 학생 로그인과 수강신청 동작 확인 |
 | DB 권한 | 애플리케이션 전용 계정에 SELECT, INSERT, UPDATE, DELETE 권한 적용 |
 | 접속 정보 | Windows 시스템 환경변수로 분리 |
@@ -190,7 +190,7 @@ DB 연결 값은 소스에 넣지 않는다. `src/main/java/util/DBUtil.java`는
 
 ### 9.1 설치 및 운영 확인
 - Windows Server 2022 VM에 Java 11, Tomcat 9 Windows Service, MySQL 8 설치
-- MiniCampusLMS WAR 배포 및 학생 로그인/수강신청 확인
+- 기존 MiniCampusLMS WAR 배포 및 학생 로그인/수강신청 확인
 - 애플리케이션 전용 계정 사용, SELECT/INSERT/UPDATE/DELETE 최소 권한 적용
 - DB 연결 값을 Windows 시스템 환경변수로 분리
 - Tomcat/MySQL 서비스, Windows Event Log와 Firewall 로그 확인
@@ -199,6 +199,7 @@ DB 연결 값은 소스에 넣지 않는다. `src/main/java/util/DBUtil.java`는
 ### 9.2 현재 상태와 남은 점검
 - 위에 적은 서비스, 권한, 로그, 백업/복구 실습은 완료했다.
 - 자동화된 장애 복구나 예약 백업을 구축했다는 뜻은 아니다.
+- 아래 동시성 개선은 로컬 Eclipse/Tomcat에서 검증했다. 이 개선을 포함한 최신 WAR의 Windows Server 재배포와 서버 환경 재검증은 아직 완료하지 않았다.
 
 ### 9.3 Phase 1 적용 방향
 Windows Server는 학습용 VM이며 실제 기관 운영 서버가 아니다. Tomcat 8080 접근 제어는 10장에서 설명한다.
@@ -239,19 +240,36 @@ WAF는 공격 형태의 웹 요청을 탐지하거나 차단하는 방어 계층
 
 ---
 
-## 12. 결론 및 운영 요약
+## 12. [완료] 수강신청 동시성 검증
+
+로컬 Eclipse/Tomcat 환경에서 [MiniCampusLMS_Concurrency_Test.jmx](MiniCampusLMS_Concurrency_Test.jmx)를 사용해 개설강좌 정원 경쟁 조건을 검증했다. 테스트 대상은 `section_id=12`, `capacity=1`, `status=OPEN`이며, 서로 다른 학생 4명으로 Thread 4, Login 4회, Enrollment 4회, Synchronizing Timer 그룹 크기 4 조건을 사용했다.
+
+| 단계 | JMeter 결과 | DB 결과 |
+| :--- | :--- | :--- |
+| 개선 전 | 총 요청 8건, Err 0 | `ENROLLED=4`로 정원 초과 재현 |
+| 개선 후 | 동일 조건 총 요청 8건, Err 0 | 최종 `ENROLLED=1`, 정원 초과 방지 확인 |
+
+개선은 `studentCourseEnrollAction.jsp`에서 JDBC `setAutoCommit(false)`로 트랜잭션을 시작하고, 대상 `course_sections` 행을 `SELECT ... FOR UPDATE`로 잠근 뒤 `ENROLLED` 인원을 다시 `COUNT`하여 정원을 확인하도록 적용했다. 정원 이내인 경우 INSERT 후 commit하고, 실패 또는 예외로 완료되지 않은 경로는 rollback한다.
+
+이 결과는 로컬 개발 환경에서 확인한 것이다. Windows Server의 기존 배포 실습과 구분해야 하며, 위 동시성 변경을 포함한 최신 WAR의 Windows Server 재배포 및 재검증은 아직 완료하지 않았다. JMX 파일은 저장소에 있으나 JMeter 원본 결과 파일은 저장소에 포함되지 않았다.
+
+### 향후 수강신청 개선
+
+- 같은 과목의 다른 분반 중복 신청 방지
+- 시간표 충돌 검사
+- 취소 후 동일 분반 재신청
+
+## 13. 결론 및 운영 요약
 ### [현재 상태]
 
 MiniCampusLMS는 Java 11, JSP/JDBC, Tomcat 9, MySQL 8 기반이다. Windows Server 2022, Ubuntu/Nginx Reverse Proxy, Windows Firewall 접근 제어, ModSecurity/CRS 탐지·차단, 수동 DB 백업/복구와 로그 확인을 실제 실습 VM에서 검증했다. GitHub 저장소에는 이를 재현·검토할 증빙 자료가 아직 없다.
 
 ### [향후 계획]
 
-- 수강취소 및 내 수강내역 조회
 - 같은 과목의 다른 분반 중복 신청 차단
 - 시간표 충돌 검사
-- 명시적 DB Transaction 및 commit/rollback
-- 취소 후 재신청 처리
-- JMeter 동시성 검증 및 DB Lock 적용
+- 취소 후 동일 분반 재신청 처리
+- 동시성 개선을 포함한 최신 WAR의 Windows Server 재배포 및 재검증
 - Splunk 통합 로그 수집, 대시보드, Alert
 - 자동 예약 백업 및 보관주기 정책
 - 별도 DB 서버 분리
